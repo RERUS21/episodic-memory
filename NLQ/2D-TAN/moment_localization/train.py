@@ -23,6 +23,10 @@ from core.utils import create_logger
 import models.loss as loss
 import math
 
+# Abilita il debug CUDA
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['TORCH_USE_CUDA_DSA'] = '1'
+
 ########### fix everything ###########
 seed = 42
 torch.manual_seed(seed)
@@ -99,7 +103,7 @@ if __name__ == '__main__':
         eval_train_dataset = getattr(datasets, dataset_name)('train')
     if not config.DATASET.NO_VAL:
         val_dataset = getattr(datasets, dataset_name)('val')
-    test_dataset = getattr(datasets, dataset_name)('test')
+#    test_dataset = getattr(datasets, dataset_name)('test')
 
     model = getattr(models, model_name)()
     if config.MODEL.CHECKPOINT and config.TRAIN.CONTINUE:
@@ -131,13 +135,13 @@ if __name__ == '__main__':
                                     num_workers=config.WORKERS,
                                     pin_memory=False,
                                     collate_fn=datasets.collate_fn)
-        elif split == 'test':
-            dataloader = DataLoader(test_dataset,
-                                    batch_size=config.TEST.BATCH_SIZE,
-                                    shuffle=False,
-                                    num_workers=config.WORKERS,
-                                    pin_memory=False,
-                                    collate_fn=datasets.collate_fn)
+#        elif split == 'test':
+#            dataloader = DataLoader(test_dataset,
+#                                    batch_size=config.TEST.BATCH_SIZE,
+#                                    shuffle=False,
+#                                    num_workers=config.WORKERS,
+#                                    pin_memory=False,
+#                                    collate_fn=datasets.collate_fn)
         elif split == 'train_no_shuffle':
             dataloader = DataLoader(eval_train_dataset,
                                     batch_size=config.TEST.BATCH_SIZE,
@@ -220,15 +224,15 @@ if __name__ == '__main__':
                                                  'performance on validation set')
                 table_message += '\n'+ val_table
 
-            test_state = engine.test(network, iterator('test'), 'test')
-            loss_message += ' test loss {:.4f}'.format(test_state['loss_meter'].avg)
-            test_state['loss_meter'].reset()
-            test_table = eval.display_results(test_state['Rank@N,mIoU@M'], test_state['miou'],
-                                              'performance on testing set')
-            table_message += '\n' + test_table
+#            test_state = engine.test(network, iterator('test'), 'test')
+#            loss_message += ' test loss {:.4f}'.format(test_state['loss_meter'].avg)
+#            test_state['loss_meter'].reset()
+#            test_table = eval.display_results(test_state['Rank@N,mIoU@M'], test_state['miou'],
+#                                              'performance on testing set')
+#            table_message += '\n' + test_table
 
-            message = loss_message+table_message+'\n'
-            logger.info(message)
+#            message = loss_message+table_message+'\n'
+#            logger.info(message)
 
             saved_model_filename = os.path.join(config.MODEL_DIR,'{}/{}/iter{:06d}-{:.4f}-{:.4f}.pkl'.format(
                 dataset_name, model_name+'_'+config.DATASET.VIS_INPUT_TYPE,
@@ -271,8 +275,8 @@ if __name__ == '__main__':
                 state['progress_bar'] = tqdm(total=math.ceil(len(train_dataset)/config.TEST.BATCH_SIZE))
             elif state['split'] == 'val':
                 state['progress_bar'] = tqdm(total=math.ceil(len(val_dataset)/config.TEST.BATCH_SIZE))
-            elif state['split'] == 'test':
-                state['progress_bar'] = tqdm(total=math.ceil(len(test_dataset)/config.TEST.BATCH_SIZE))
+#            elif state['split'] == 'test':
+#                state['progress_bar'] = tqdm(total=math.ceil(len(test_dataset)/config.TEST.BATCH_SIZE))
             else:
                 raise NotImplementedError
 
