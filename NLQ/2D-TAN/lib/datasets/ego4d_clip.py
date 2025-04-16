@@ -7,7 +7,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.utils.data as data
-import torchtext
+#import torchtext
 import glob
 import numpy as np
 import pandas as pd
@@ -35,13 +35,16 @@ class Ego4DClip(data.Dataset):
 
         # load annotations
         if split == "train":
-            anno_path = os.path.join(self.data_dir, "nlq_train.json")
-        elif split == "val":  # use val set for test
-            anno_path = os.path.join(self.data_dir, "nlq_val.json")
-        elif split == "test":  # TODO delete this line for final release
-            anno_path = os.path.join(self.data_dir, "nlq_test_unannotated.json") # .json") # _unannotated.json")
+            anno_path = "/content/ego4d_data/v1/annotations/nlq_train.json"
+        else:  # use val set for test
+            anno_path = "/content/ego4d_data/v1/annotations/nlq_val.json"
+        #elif split == "test":  # TODO delete this line for final release
+        #    anno_path = os.path.join(self.data_dir, "nlq_test_unannotated.json") # .json") # _unannotated.json")
         with open(anno_path) as f:
             anno_json = json.load(f)
+
+        print(split)
+        print(anno_path)
 
         anno_pairs = []
         query_loop_count = 0
@@ -55,6 +58,8 @@ class Ego4DClip(data.Dataset):
                 for anno in anno_clip["annotations"]:
                     anno_uid = anno['annotation_uid']
                     for query_idx, query in enumerate(anno["language_queries"]):
+                        if 'query' not in query or query['query'] is None:
+                          continue
                         if split == 'test':
                             query_times = 0,0
                         else:
@@ -96,43 +101,41 @@ class Ego4DClip(data.Dataset):
                                             query_times[1] - w_start,
                                         ],
                                         'query_uid': anno_uid+'_'+query["query"],
+                                        "query_idx": query_idx,
+                                        "clip": clip_uid, # used in evaluation server
                                     }
                                     if w_start < clip_duration:
                                         anno_pairs.append(new_anno)
 
                         else:  # for val/test set, we need to process all windows
-                            if split == 'val':
-                                if self.min_duration > query_duration or query_duration > self.window or (
-                                    self.debug and video_count > 1 # only for debug
-                                ):
-                                    break
-                            else: # test set does not remove any query
-                                query_loop_count += 1
-                                new_anno = None
-                                if int(clip_duration) - self.window + stride <= stride:
-                                    print('warning:', int(clip_duration), self.window, stride)
-                                for w_start in range(
-                                    0, int(clip_duration) - self.window + stride, stride
-                                ):
-                                    new_anno = {
-                                        "video": video_name,
-                                        "clip": clip_uid, # used in evaluation server
-                                        "clip_se": clip_times,
-                                        "description": query["query"],
-                                        "window": [w_start, w_start + self.window],
-                                        "clip_duration": clip_duration,
-                                        "times": [query_times[0], query_times[1]],
-                                        "query_uid": anno_uid+'_'+str(query_idx),
-                                        "query_idx": query_idx,
-                                    }
-                                    if (
-                                        self.temp is None
-                                        or anno_df["query"].values[i]
-                                        in self.query_template[self.temp]
-                                    ):
-                                        anno_pairs.append(new_anno)
-                                if new_anno is None:
-                                    print('Warning!')
+                          query_loop_count += 1
+                          new_anno = None
+                          if int(clip_duration) - self.window + stride <= stride:
+                              print('warning:', int(clip_duration), self.window, stride)
+                          for w_start in range(
+                              0, int(clip_duration) - self.window + stride, stride
+                          ):
+                              if 'query' not in query:
+                                continue
+                              new_anno = {
+                                  "video": video_name,
+                                  "clip": clip_uid, # used in evaluation server
+                                  "clip_se": clip_times,
+                                  "description": query["query"],
+                                  "window": [w_start, w_start + self.window],
+                                  "clip_duration": clip_duration,
+                                  "times": [query_times[0], query_times[1]],
+                                  "query_uid": anno_uid+'_'+str(query_idx),
+                                  "query_idx": query_idx,
+                              }
+                              if (
+                                  self.temp is None
+                                  or anno_df["query"].values[i]
+                                  in self.query_template[self.temp]
+                              ):
+                                  anno_pairs.append(new_anno)
+                          if new_anno is None:
+                              print('Warning!')
 
         print(
             " -- collected {} samples for dataset {}".format(
@@ -231,7 +234,17 @@ class Ego4DClip(data.Dataset):
     def get_video_features(self, vid, duration, window_se=None, clip_se=None):
         if "slowfast" == config.DATASET.VIS_INPUT_TYPE:
             fps = 30.0/16 # feature per second. assume
-            feature = torch.load(self.data_dir + "/sf/{}.pt".format(vid))
+            #feature = torch.load(self.data_dir + "/sf/{}.pt".format(vid))
+            feature = torch.load(self.data_dir + "/{}.pt".format(vid))
+
+            # features = np.load(self.data_dir + '/2d/{}.npy'.format(vid))
+            features = torch.tensor(feature).float()
+            # duration = features.shape[0]*fps
+            # fps = 1.0 * features.shape[0] / duration
+
+        elif "omnivore_video_swinl_fp16" == config.DATASET.VIS_INPUT_TYPE:
+            fps = 30.0/16 # feature per second. assume
+            feature = torch.load(f"/content/ego4d_data/v1/omnivore_video_swinl_fp16/{vid}.pt")
 
             # features = np.load(self.data_dir + '/2d/{}.npy'.format(vid))
             features = torch.tensor(feature).float()
