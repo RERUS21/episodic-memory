@@ -164,20 +164,20 @@ if __name__ == '__main__':
 
         prediction, map_mask = model(textual_input, textual_mask, visual_input)   
 
-        print("prediction shape:", prediction.shape)
-        print("prediction dtype:", prediction.dtype)
-        print("prediction contains NaN:", torch.isnan(prediction).any())  # Controlla NaN
-        print("prediction contains Inf:", torch.isinf(prediction).any())  # Controlla infiniti
+        #print("prediction shape:", prediction.shape)
+        #print("prediction dtype:", prediction.dtype)
+        #print("prediction contains NaN:", torch.isnan(prediction).any())  # Controlla NaN
+        #print("prediction contains Inf:", torch.isinf(prediction).any())  # Controlla infiniti
 
-        print("map_mask shape:", map_mask.shape)
-        print("map_mask dtype:", map_mask.dtype)
-        print("map_mask contains NaN:", torch.isnan(map_mask).any())
-        print("map_mask contains Inf:", torch.isinf(map_mask).any())
+        #print("map_mask shape:", map_mask.shape)
+        #print("map_mask dtype:", map_mask.dtype)
+        #print("map_mask contains NaN:", torch.isnan(map_mask).any())
+        #print("map_mask contains Inf:", torch.isinf(map_mask).any())
 
-        print("map_gt shape:", map_gt.shape)
-        print("map_gt dtype:", map_gt.dtype)
-        print("map_gt contains NaN:", torch.isnan(map_gt).any())
-        print("map_gt contains Inf:", torch.isinf(map_gt).any())
+        #print("map_gt shape:", map_gt.shape)
+        #print("map_gt dtype:", map_gt.dtype)
+        #print("map_gt contains NaN:", torch.isnan(map_gt).any())
+        #print("map_gt contains Inf:", torch.isinf(map_gt).any())
         
         loss_value, joint_prob = getattr(loss, config.LOSS.NAME)(prediction, map_mask, map_gt, config.LOSS.PARAMS)
 
