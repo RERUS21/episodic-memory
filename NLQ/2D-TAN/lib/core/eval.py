@@ -13,6 +13,8 @@ def iou(pred, gt): # require pred and gt is numpy
     if not pred_is_list: pred = [pred]
     if not gt_is_list: gt = [gt]
     pred, gt = np.array(pred), np.array(gt)
+    #PATCH: sostituiamo i NaN in gt con 0.0
+    gt = np.nan_to_num(gt, nan=0.0)
     inter_left = np.maximum(pred[:,0,None], gt[None,:,0])
     inter_right = np.minimum(pred[:,1,None], gt[None,:,1])
     inter = np.maximum(0.0, inter_right - inter_left)
