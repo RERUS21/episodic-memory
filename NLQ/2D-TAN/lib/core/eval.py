@@ -75,12 +75,13 @@ def eval(segments, data):
     return eval_result, miou
 
 def eval_predictions(segments, data, verbose=True, merge_window=False):
-    if merge_window:
+    # Abilita merge_window solo se 'query_uid' è presente nei dati
+    if merge_window and 'query_uid' in data[0]:
         merge_seg = {}
         merge_data = {}
         for seg, dat in zip(segments, data):
-            pair_id = dat['query_uid'] # + '_' + str(dat['query_idx'])
-            if pair_id not in merge_seg.keys(): # new 
+            pair_id = dat['query_uid']
+            if pair_id not in merge_seg.keys():
                 merge_data[pair_id] = {
                     'video': dat['video'],
                     'duration': dat['clip_duration'],
@@ -89,23 +90,25 @@ def eval_predictions(segments, data, verbose=True, merge_window=False):
                 }
                 merge_seg[pair_id] = []
             offset = dat['window'][0]
-            merge_seg[pair_id].extend([[se[0]+offset, se[1]+offset, se[2]] for se in seg])
+            merge_seg[pair_id].extend([[se[0] + offset, se[1] + offset, se[2]] for se in seg])
         segments, data = [], []
         for k in merge_seg.keys():
-            # random.shuffle(merge_seg)
             segments.append(sorted(merge_seg[k], key=lambda x: x[2], reverse=True))
             data.append(merge_data[k])
 
+    # Applica NMS
     segments = [nms(seg, thresh=config.TEST.NMS_THRESH, top_k=5).tolist() for seg in segments]
 
+    # Salvataggio opzionale
     with open('results.pickle', 'wb') as f:
-        pkl.dump({'prediction':segments,'data':data},f)
+        pkl.dump({'prediction': segments, 'data': data}, f)
 
     eval_result, miou = eval(segments, data)
     if verbose:
         print(display_results(eval_result, miou, ''))
 
     return eval_result, miou
+
 
 def display_results(eval_result, miou, title=None):
     tious = [float(i) for i in config.TEST.TIOU.split(',')] if isinstance(config.TEST.TIOU,str) else [config.TEST.TIOU]
