@@ -162,14 +162,14 @@ if __name__ == '__main__':
         map_gt = sample['batch_map_gt'].cuda()
         duration = sample['batch_duration']
 
-        prediction, map_mask = model(textual_input, textual_mask, visual_input)
+        prediction, map_mask = model(textual_input, textual_mask, visual_input)   
 
         print("prediction shape:", prediction.shape)
-             print("prediction dtype:", prediction.dtype)
-             print("map_mask shape:", map_mask.shape)
-             print("map_mask dtype:", map_mask.dtype)
-             print("map_gt shape:", map_gt.shape)
-             print("map_gt dtype:", map_gt.dtype)        
+        print("prediction dtype:", prediction.dtype)
+        print("map_mask shape:", map_mask.shape)
+        print("map_mask dtype:", map_mask.dtype)
+        print("map_gt shape:", map_gt.shape)
+        print("map_gt dtype:", map_gt.dtype)
         
         loss_value, joint_prob = getattr(loss, config.LOSS.NAME)(prediction, map_mask, map_gt, config.LOSS.PARAMS)
 
