@@ -21,11 +21,22 @@ def iou(pred, gt): # require pred and gt is numpy
     union_left = np.minimum(pred[:,0,None], gt[None,:,0])
     union_right = np.maximum(pred[:,1,None], gt[None,:,1])
     union = np.maximum(0.0, union_right - union_left)
-    overlap = 1.0 * inter / union
-    if not gt_is_list:
-        overlap = overlap[:,0]
-    if not pred_is_list:
+
+    #overlap = 1.0 * inter / union
+    #if not gt_is_list:
+    #    overlap = overlap[:,0]
+    #if not pred_is_list:
+    #    overlap = overlap[0]
+    #return overlap
+
+    eps = 1e-8  # piccola costante per evitare divisione per zero
+    overlap = inter / (union + eps)
+    
+    if not gt_is_list and overlap.ndim > 1:
+        overlap = overlap[:, 0]
+    if not pred_is_list and overlap.ndim > 1:
         overlap = overlap[0]
+    
     return overlap
 
 def rank(pred, gt):
