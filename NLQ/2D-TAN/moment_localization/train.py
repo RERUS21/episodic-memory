@@ -183,13 +183,14 @@ if __name__ == '__main__':
         #print("map_gt min:", map_gt.min().item(), "max:", map_gt.max().item())
         #assert (map_gt >= 0).all() and (map_gt <= 1).all(), "Errore: map_gt fuori dal range [0,1]"
 
-        if torch.isnan(map_gt).any():
-            print("==== ERRORE: map_gt contiene NaN ====")
-            print("sample keys:", sample.keys())
-            print("batch_anno_idxs:", sample['batch_anno_idxs'])
-            print("batch_duration:", sample['batch_duration'])
-            print("map_gt:", map_gt)
-            # volendo puoi stampare anche visual_input.shape ecc.
+        # ===== DEBUG: Controllo NaN in map_gt =====
+        # if torch.isnan(map_gt).any():
+        #     print("==== ERRORE: map_gt contiene NaN ====")
+        #     print("sample keys:", sample.keys())
+        #     print("batch_anno_idxs:", sample['batch_anno_idxs'])
+        #     print("batch_duration:", sample['batch_duration'])
+        #     print("map_gt:", map_gt)
+        #     # volendo puoi stampare anche visual_input.shape ecc.
 
         loss_value, joint_prob = getattr(loss, config.LOSS.NAME)(prediction, map_mask, map_gt, config.LOSS.PARAMS)
 
