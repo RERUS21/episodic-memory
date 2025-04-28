@@ -270,7 +270,7 @@ if __name__ == '__main__':
 
             saved_model_filename = os.path.join(config.MODEL_DIR,'{}/{}/iter{:06d}-{:.4f}-{:.4f}.pkl'.format(
                 dataset_name, model_name+'_'+config.DATASET.VIS_INPUT_TYPE,
-                state['t'], test_state['Rank@N,mIoU@M'][0,0], test_state['Rank@N,mIoU@M'][0,1]))
+                state['t'], train_state['Rank@N,mIoU@M'][0,0], train_state['Rank@N,mIoU@M'][0,1])) # APPLICATA QUI LA MODIFICA DA test_state a train_state
 
             rootfolder1 = os.path.dirname(saved_model_filename)
             rootfolder2 = os.path.dirname(rootfolder1)
