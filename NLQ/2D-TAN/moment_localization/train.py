@@ -246,6 +246,11 @@ if __name__ == '__main__':
                 table_message += '\n'+ train_table
             if not config.DATASET.NO_VAL:
                 val_state = engine.test(network, iterator('val'), 'val')
+               
+                torch.cuda.empty_cache() # SVUOTA RAM
+                import gc # SVUOTA RAM
+                gc.collect() # SVUOTA RAM
+               
                 state['scheduler'].step(-val_state['loss_meter'].avg)
                 loss_message += ' val loss {:.4f}'.format(val_state['loss_meter'].avg)
                 val_state['loss_meter'].reset()
@@ -323,6 +328,11 @@ if __name__ == '__main__':
         annotations = state['iterator'].dataset.annotations
         merge = (state['split'] != 'train')
         state['Rank@N,mIoU@M'], state['miou'] = eval.eval_predictions(state['sorted_segments_list'], annotations, verbose=False, merge_window=merge)
+      
+        torch.cuda.empty_cache() # SVUOTA RAM
+        import gc # SVUOTA RAM
+        gc.collect() # SVUOTA RAM
+       
         if config.VERBOSE:
             state['progress_bar'].close()
 
