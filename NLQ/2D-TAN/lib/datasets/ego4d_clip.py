@@ -238,7 +238,8 @@ class Ego4DClip(data.Dataset):
             feature = torch.load(self.data_dir + "/{}.pt".format(vid))
 
             # features = np.load(self.data_dir + '/2d/{}.npy'.format(vid))
-            features = torch.tensor(feature).float()
+            #features = torch.tensor(feature).float()
+            features = feature.clone().detach().float() #MODIFICATO
             # duration = features.shape[0]*fps
             # fps = 1.0 * features.shape[0] / duration
 
