@@ -1,5 +1,4 @@
-#WORKERS: 0
-WORKERS: 2
+WORKERS: 0
 DEBUG: False
 
 MODEL_DIR: ./checkpoints
