@@ -35,7 +35,7 @@ TRAIN:
   LR: 0.0001
   WEIGHT_DECAY: 0.0000
   #MAX_EPOCH: 50
-  MAX_EPOCH: 2  # Alleggerito per limiti di utilizzo piano gratuito COLAB 
+  MAX_EPOCH: 1  # Alleggerito per limiti di utilizzo piano gratuito COLAB 
   CONTINUE: False
 
 LOSS:
