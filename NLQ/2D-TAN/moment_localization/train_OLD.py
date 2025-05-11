@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard.writer import SummaryWriter #PER TENSORBOARD
 import torch.optim as optim
 from tqdm import tqdm
 import datasets
@@ -90,6 +91,15 @@ if __name__ == '__main__':
     logger.info('\n'+pprint.pformat(args))
     logger.info('\n'+pprint.pformat(config))
 
+    # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
+    writer = None
+    if config.LOG_DIR:
+        log_dir = os.path.join(config.LOG_DIR, config.TAG or 'default')
+        os.makedirs(log_dir, exist_ok=True)
+        print(f"Writing TensorBoard logs to: {log_dir}")
+        writer = SummaryWriter(log_dir=log_dir)
+    # ------------------------------------------------------------------
+    
     # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
@@ -299,7 +309,14 @@ if __name__ == '__main__':
     def on_end(state):
         if config.VERBOSE:
             state['progress_bar'].close()
-
+            
+       # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
+        print("Training completed.")
+        if writer:
+            writer.close()
+        import sys
+        sys.exit(0)
+       # ------------------------------------------------------------------
 
     def on_test_start(state):
         state['loss_meter'] = AverageMeter()
@@ -336,6 +353,12 @@ if __name__ == '__main__':
         if config.VERBOSE:
             state['progress_bar'].close()
 
+        # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
+        if writer and state['split'] == 'val':
+            writer.add_scalar('Validation/Loss', state['loss_meter'].avg, global_step=state['t'])
+            writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
+        # ------------------------------------------------------------------
+    
     engine = Engine()
     engine.hooks['on_start'] = on_start
     engine.hooks['on_forward'] = on_forward
