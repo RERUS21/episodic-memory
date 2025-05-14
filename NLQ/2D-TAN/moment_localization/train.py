@@ -92,12 +92,20 @@ if __name__ == '__main__':
     logger.info('\n'+pprint.pformat(config))
 
     # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
+    
+    #writer = None
+    #if config.LOG_DIR:
+    #    log_dir = os.path.join(config.LOG_DIR, config.TAG or 'default')
+    #    os.makedirs(log_dir, exist_ok=True)
+    #    print(f"Writing TensorBoard logs to: {log_dir}")
+    #    writer = SummaryWriter(log_dir=log_dir)
+
     writer = None
-    if config.LOG_DIR:
-        log_dir = os.path.join(config.LOG_DIR, config.TAG or 'default')
-        os.makedirs(log_dir, exist_ok=True)
-        print(f"Writing TensorBoard logs to: {log_dir}")
-        writer = SummaryWriter(log_dir=log_dir)
+    log_dir = os.path.join('runs', config.TAG or 'default')
+    os.makedirs(log_dir, exist_ok=True)
+    print(f"Writing TensorBoard logs to: {log_dir}")
+    writer = SummaryWriter(log_dir=log_dir)
+
     # ------------------------------------------------------------------
     
     # cudnn related setting
