@@ -256,6 +256,7 @@ if __name__ == '__main__':
         
         # Test and log at test_interval
         if state['t'] % state['test_interval'] == 0:
+            state['test_step'] = state['t']
             model.eval()
         
             if config.VERBOSE:
@@ -379,7 +380,8 @@ if __name__ == '__main__':
 
         # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
         if writer and state['split'] == 'val':
-            writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
+            #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
+            writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state.get('test_step', state['t']))
             writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
         # ------------------------------------------------------------------
     
