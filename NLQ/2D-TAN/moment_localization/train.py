@@ -251,7 +251,8 @@ if __name__ == '__main__':
             state['progress_bar'].update(1)
 
         # Log scalar training loss at every step
-        writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['t'])
+        #writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['t'])
+        #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
         
         # Test and log at test_interval
         if state['t'] % state['test_interval'] == 0:
@@ -281,7 +282,7 @@ if __name__ == '__main__':
                 gc.collect()
         
                 # Log validation loss to TensorBoard
-                writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=state['t'])
+                #writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=state['t'])
         
                 state['scheduler'].step(-val_state['loss_meter'].avg)
         
@@ -378,8 +379,8 @@ if __name__ == '__main__':
 
         # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
         if writer and state['split'] == 'val':
-            writer.add_scalar('Validation/Loss', state['loss_meter'].avg, global_step=state['t'])
-            writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
+            writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
+            writer.add_scalar('Validation/mIoU', state['miou'].val, global_step=state['t'])
         # ------------------------------------------------------------------
     
     engine = Engine()
