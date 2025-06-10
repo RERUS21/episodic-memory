@@ -247,89 +247,89 @@ if __name__ == '__main__':
         state['loss_meter'].update(state['loss'].item(), 1)
 
     def on_update(state):# Save All
-        if config.VERBOSE:
-            state['progress_bar'].update(1)
-
-        # Log scalar training loss at every step
-        #writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['t'])
-        #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
+        # Test e log ogni test_interval  
+        if state['t'] % state['test_interval'] == 0:  
+            state['test_step'] = state['t']  
+            model.eval()  
         
-        # Test and log at test_interval
-        if state['t'] % state['test_interval'] == 0:
-            state['test_step'] = state['t']
-            model.eval()
+            if config.VERBOSE:  
+                state['progress_bar'].close()  
         
-            if config.VERBOSE:
-                state['progress_bar'].close()
+            loss_message = '\niter: {} train loss {:.4f}'.format(  
+                state['t'], state['loss_meter'].avg  
+            )  
+            table_message = ''  
         
-            loss_message = '\niter: {} train loss {:.4f}'.format(state['t'], state['loss_meter'].avg)
-            table_message = ''
+            if config.TEST.EVAL_TRAIN:  
+                train_state = engine.test(network, iterator('train_no_shuffle'), 'train')  
+                train_table = eval.display_results(  
+                    train_state['Rank@N,mIoU@M'],  
+                    train_state['miou'],  
+                    'performance on training set'  
+                )  
+                table_message += '\n' + train_table  
         
-            if config.TEST.EVAL_TRAIN:
-                train_state = engine.test(network, iterator('train_no_shuffle'), 'train')
-                train_table = eval.display_results(
-                    train_state['Rank@N,mIoU@M'],
-                    train_state['miou'],
-                    'performance on training set'
-                )
-                table_message += '\n' + train_table
+            if not config.DATASET.NO_VAL:  
+                val_state = engine.test(network, iterator('val'), 'val')  
         
-            if not config.DATASET.NO_VAL:
-                val_state = engine.test(network, iterator('val'), 'val')
+                # Libera la memoria  
+                torch.cuda.empty_cache()  
+                import gc  
+                gc.collect()  
         
-                # Libera la memoria
-                torch.cuda.empty_cache()
-                import gc
-                gc.collect()
+                # Log loss di validazione su TensorBoard  
+                if writer is not None:  
+                    writer.add_scalar(  
+                        'Loss/val',  
+                        val_state['loss_meter'].avg,  
+                        global_step=state['t']  
+                    )  
         
-                # Log validation loss to TensorBoard
-                #writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=state['t'])
+                state['scheduler'].step(-val_state['loss_meter'].avg)  
         
-                state['scheduler'].step(-val_state['loss_meter'].avg)
+                loss_message += ' val loss {:.4f}'.format(val_state['loss_meter'].avg)  
+                val_state['loss_meter'].reset()  
         
-                loss_message += ' val loss {:.4f}'.format(val_state['loss_meter'].avg)
-                val_state['loss_meter'].reset()
+                val_table = eval.display_results(  
+                    val_state['Rank@N,mIoU@M'],  
+                    val_state['miou'],  
+                    'performance on validation set'  
+                )  
+                table_message += '\n' + val_table  
         
-                val_table = eval.display_results(
-                    val_state['Rank@N,mIoU@M'],
-                    val_state['miou'],
-                    'performance on validation set'
-                )
-                table_message += '\n' + val_table
+            # Salvataggio del modello  
+            saved_model_filename = os.path.join(  
+                config.MODEL_DIR,  
+                '{}/{}/iter{:06d}-{:.4f}-{:.4f}.pkl'.format(  
+                    dataset_name,  
+                    model_name + '_' + config.DATASET.VIS_INPUT_TYPE,  
+                    state['t'],  
+                    train_state['Rank@N,mIoU@M'][0, 0],  
+                    train_state['Rank@N,mIoU@M'][0, 1]  
+                )  
+            )  
         
-            # Salvataggio del modello
-            saved_model_filename = os.path.join(
-                config.MODEL_DIR,
-                '{}/{}/iter{:06d}-{:.4f}-{:.4f}.pkl'.format(
-                    dataset_name,
-                    model_name + '_' + config.DATASET.VIS_INPUT_TYPE,
-                    state['t'],
-                    train_state['Rank@N,mIoU@M'][0, 0],
-                    train_state['Rank@N,mIoU@M'][0, 1]
-                )
-            )
+            # Crea le directory se non esistono  
+            rootfolder1 = os.path.dirname(saved_model_filename)  
+            rootfolder2 = os.path.dirname(rootfolder1)  
+            rootfolder3 = os.path.dirname(rootfolder2)  
         
-            # Crea le directory se mancano
-            rootfolder1 = os.path.dirname(saved_model_filename)
-            rootfolder2 = os.path.dirname(rootfolder1)
-            rootfolder3 = os.path.dirname(rootfolder2)
+            for folder in [rootfolder3, rootfolder2, rootfolder1]:  
+                if not os.path.exists(folder):  
+                    print('Make directory %s ...' % folder)  
+                    os.mkdir(folder)  
         
-            for folder in [rootfolder3, rootfolder2, rootfolder1]:
-                if not os.path.exists(folder):
-                    print('Make directory %s ...' % folder)
-                    os.mkdir(folder)
+            # Salva stato del modello  
+            if torch.cuda.device_count() > 1:  
+                torch.save(model.module.state_dict(), saved_model_filename)  
+            else:  
+                torch.save(model.state_dict(), saved_model_filename)  
         
-            # Salva lo stato del modello
-            if torch.cuda.device_count() > 1:
-                torch.save(model.module.state_dict(), saved_model_filename)
-            else:
-                torch.save(model.state_dict(), saved_model_filename)
+            if config.VERBOSE:  
+                state['progress_bar'] = tqdm(total=state['test_interval'])  
         
-            if config.VERBOSE:
-                state['progress_bar'] = tqdm(total=state['test_interval'])
-        
-            model.train()
-            state['loss_meter'].reset()       
+            model.train()  
+            state['loss_meter'].reset()
 
     def on_end(state):
         if config.VERBOSE:
@@ -381,7 +381,7 @@ if __name__ == '__main__':
         # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
         if writer and state['split'] == 'val':
             #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
-            writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state.get('test_step',state['t']))
+            #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state.get('test_step',state['t']))
             writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
         # ------------------------------------------------------------------
     
