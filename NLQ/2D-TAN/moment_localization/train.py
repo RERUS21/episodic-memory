@@ -246,15 +246,20 @@ if __name__ == '__main__':
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
         state['loss_meter'].update(state['loss'].item(), 1)
 
-    def on_update(state):  # Save All
+    # all'inizio del train.py, prima del training loop
+    global_step_counter = 0
+
+    def on_update(state):
+        global global_step_counter  # usiamo la variabile globale
+    
         if config.VERBOSE:
             state['progress_bar'].update(1)
     
-        # Logging continuo del training loss (ogni batch)
+        # Logging continuo train loss
         if writer is not None:
-            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['t'])
+            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=global_step_counter)
     
-        # Test and log at test_interval
+        # Test e validazione
         if state['t'] % state['test_interval'] == 0:
             state['test_step'] = state['t']
             model.eval()
@@ -277,15 +282,13 @@ if __name__ == '__main__':
             if not config.DATASET.NO_VAL:
                 val_state = engine.test(network, iterator('val'), 'val')
     
-                # Libera la memoria
                 torch.cuda.empty_cache()
                 import gc
                 gc.collect()
     
-                # Logging continuo della validation loss e mIoU
                 if writer is not None:
-                    writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=state['t'])
-                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=state['t'])
+                    writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=global_step_counter)
+                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=global_step_counter)
     
                 state['scheduler'].step(-val_state['loss_meter'].avg)
     
@@ -311,7 +314,6 @@ if __name__ == '__main__':
                 )
             )
     
-            # Crea le directory se mancano
             rootfolder1 = os.path.dirname(saved_model_filename)
             rootfolder2 = os.path.dirname(rootfolder1)
             rootfolder3 = os.path.dirname(rootfolder2)
@@ -321,7 +323,6 @@ if __name__ == '__main__':
                     print('Make directory %s ...' % folder)
                     os.mkdir(folder)
     
-            # Salva lo stato del modello
             if torch.cuda.device_count() > 1:
                 torch.save(model.module.state_dict(), saved_model_filename)
             else:
@@ -332,6 +333,9 @@ if __name__ == '__main__':
     
             model.train()
             state['loss_meter'].reset()
+    
+        # Alla fine di ogni batch, incrementiamo il contatore globale
+        global_step_counter += 1
 
     def on_end(state):
         if config.VERBOSE:
