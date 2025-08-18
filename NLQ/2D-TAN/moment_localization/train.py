@@ -339,8 +339,8 @@ if __name__ == '__main__':
         print("Training completed.")
         if writer:
             writer.close()
-        import sys
-        sys.exit(0)
+        #import sys
+        #sys.exit(0)
        # ------------------------------------------------------------------
 
     def on_test_start(state):
