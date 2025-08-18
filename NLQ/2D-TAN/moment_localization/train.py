@@ -93,13 +93,6 @@ if __name__ == '__main__':
 
     # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
     
-    #writer = None
-    #if config.LOG_DIR:
-    #    log_dir = os.path.join(config.LOG_DIR, config.TAG or 'default')
-    #    os.makedirs(log_dir, exist_ok=True)
-    #    print(f"Writing TensorBoard logs to: {log_dir}")
-    #    writer = SummaryWriter(log_dir=log_dir)
-
     writer = None
     log_dir = os.path.join('runs', config.TAG or 'default')
     os.makedirs(log_dir, exist_ok=True)
@@ -108,7 +101,6 @@ if __name__ == '__main__':
 
     # ------------------------------------------------------------------
     
-    # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
@@ -121,7 +113,6 @@ if __name__ == '__main__':
         eval_train_dataset = getattr(datasets, dataset_name)('train')
     if not config.DATASET.NO_VAL:
         val_dataset = getattr(datasets, dataset_name)('val')
-#    test_dataset = getattr(datasets, dataset_name)('test')
 
     model = getattr(models, model_name)()
     if config.MODEL.CHECKPOINT and config.TRAIN.CONTINUE:
@@ -134,9 +125,7 @@ if __name__ == '__main__':
     model = model.to(device)
 
     optimizer = optim.Adam(model.parameters(),lr=config.TRAIN.LR, betas=(0.9, 0.999), weight_decay=config.TRAIN.WEIGHT_DECAY)
-    # optimizer = optim.SGD(model.parameters(), lr=config.TRAIN.LR, momentum=0.9, weight_decay=config.TRAIN.WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=config.TRAIN.FACTOR, patience=config.TRAIN.PATIENCE, verbose=config.VERBOSE)
-
 
     def iterator(split):
         if split == 'train':
@@ -153,13 +142,6 @@ if __name__ == '__main__':
                                     num_workers=config.WORKERS,
                                     pin_memory=False,
                                     collate_fn=datasets.collate_fn)
-#        elif split == 'test':
-#            dataloader = DataLoader(test_dataset,
-#                                    batch_size=config.TEST.BATCH_SIZE,
-#                                    shuffle=False,
-#                                    num_workers=config.WORKERS,
-#                                    pin_memory=False,
-#                                    collate_fn=datasets.collate_fn)
         elif split == 'train_no_shuffle':
             dataloader = DataLoader(eval_train_dataset,
                                     batch_size=config.TEST.BATCH_SIZE,
@@ -182,34 +164,6 @@ if __name__ == '__main__':
 
         prediction, map_mask = model(textual_input, textual_mask, visual_input)   
 
-        #print("prediction shape:", prediction.shape)
-        #print("prediction dtype:", prediction.dtype)
-        #print("prediction contains NaN:", torch.isnan(prediction).any())  # Controlla NaN
-        #print("prediction contains Inf:", torch.isinf(prediction).any())  # Controlla infiniti
-
-        #print("map_mask shape:", map_mask.shape)
-        #print("map_mask dtype:", map_mask.dtype)
-        #print("map_mask contains NaN:", torch.isnan(map_mask).any())
-        #print("map_mask contains Inf:", torch.isinf(map_mask).any())
-
-        #print("map_gt shape:", map_gt.shape)
-        #print("map_gt dtype:", map_gt.dtype)
-        #print("map_gt contains NaN:", torch.isnan(map_gt).any())
-        #print("map_gt contains Inf:", torch.isinf(map_gt).any())
-
-        # DEBUG: controlliamo che i target siano nel range [0,1]
-        #print("map_gt min:", map_gt.min().item(), "max:", map_gt.max().item())
-        #assert (map_gt >= 0).all() and (map_gt <= 1).all(), "Errore: map_gt fuori dal range [0,1]"
-
-        # ===== DEBUG: Controllo NaN in map_gt =====
-        # if torch.isnan(map_gt).any():
-        #     print("==== ERRORE: map_gt contiene NaN ====")
-        #     print("sample keys:", sample.keys())
-        #     print("batch_anno_idxs:", sample['batch_anno_idxs'])
-        #     print("batch_duration:", sample['batch_duration'])
-        #     print("map_gt:", map_gt)
-        #     # volendo puoi stampare anche visual_input.shape ecc.
-
         loss_value, joint_prob = getattr(loss, config.LOSS.NAME)(prediction, map_mask, map_gt, config.LOSS.PARAMS)
 
         sorted_times = None if model.training else get_proposal_results(joint_prob, duration)
@@ -217,7 +171,6 @@ if __name__ == '__main__':
         return loss_value, sorted_times
 
     def get_proposal_results(scores, durations):
-        # assume all valid scores are larger than one
         out_sorted_times = []
         for score, duration in zip(scores, durations):
             T = score.shape[-1]
@@ -246,16 +199,18 @@ if __name__ == '__main__':
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
         state['loss_meter'].update(state['loss'].item(), 1)
 
-    # all'inizio del train.py, prima del training loop
-    #global_step_counter = 0
+    # Contatore esclusivo per TensorBoard
+    tensorboard_step = 0
 
     def on_update(state):
+        global tensorboard_step  # usiamo la variabile globale
+
         if config.VERBOSE:
             state['progress_bar'].update(1)
 
         # Logging continuo train loss
         if writer is not None:
-            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['t'])
+            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=tensorboard_step)
 
         # Test e validazione
         if state['t'] % state['test_interval'] == 0:
@@ -285,8 +240,8 @@ if __name__ == '__main__':
                 gc.collect()
 
                 if writer is not None:
-                    writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=state['t'])
-                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=state['t'])
+                    writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=tensorboard_step)
+                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=tensorboard_step)
 
                 state['scheduler'].step(-val_state['loss_meter'].avg)
 
@@ -330,6 +285,9 @@ if __name__ == '__main__':
 
             model.train()
             state['loss_meter'].reset()
+
+        # Incrementiamo il contatore esclusivo per TensorBoard
+        tensorboard_step += 1
 
     def on_end(state):
         if config.VERBOSE:
