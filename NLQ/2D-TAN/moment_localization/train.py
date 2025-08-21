@@ -11,7 +11,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard.writer import SummaryWriter #PER TENSORBOARD
+from torch.utils.tensorboard.writer import SummaryWriter
 import torch.optim as optim
 from tqdm import tqdm
 import datasets
@@ -39,6 +39,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 torch.autograd.set_detect_anomaly(True)
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Train localization network')
 
@@ -91,16 +92,13 @@ if __name__ == '__main__':
     logger.info('\n'+pprint.pformat(args))
     logger.info('\n'+pprint.pformat(config))
 
-    # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
-    
+    # TensorBoard writer
     writer = None
     log_dir = os.path.join('runs', config.TAG or 'default')
     os.makedirs(log_dir, exist_ok=True)
     print(f"Writing TensorBoard logs to: {log_dir}")
     writer = SummaryWriter(log_dir=log_dir)
 
-    # ------------------------------------------------------------------
-    
     cudnn.benchmark = config.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
@@ -124,8 +122,16 @@ if __name__ == '__main__':
     device = ("cuda" if torch.cuda.is_available() else "cpu" )
     model = model.to(device)
 
-    optimizer = optim.Adam(model.parameters(),lr=config.TRAIN.LR, betas=(0.9, 0.999), weight_decay=config.TRAIN.WEIGHT_DECAY)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=config.TRAIN.FACTOR, patience=config.TRAIN.PATIENCE, verbose=config.VERBOSE)
+    optimizer = optim.Adam(model.parameters(),
+                           lr=config.TRAIN.LR,
+                           betas=(0.9, 0.999),
+                           weight_decay=config.TRAIN.WEIGHT_DECAY)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        factor=config.TRAIN.FACTOR,
+        patience=config.TRAIN.PATIENCE,
+        verbose=config.VERBOSE
+    )
 
     def iterator(split):
         if split == 'train':
@@ -151,7 +157,6 @@ if __name__ == '__main__':
                                     collate_fn=datasets.collate_fn)
         else:
             raise NotImplementedError
-
         return dataloader
 
     def network(sample):
@@ -162,12 +167,11 @@ if __name__ == '__main__':
         map_gt = sample['batch_map_gt'].cuda()
         duration = sample['batch_duration']
 
-        prediction, map_mask = model(textual_input, textual_mask, visual_input)   
-
-        loss_value, joint_prob = getattr(loss, config.LOSS.NAME)(prediction, map_mask, map_gt, config.LOSS.PARAMS)
-
+        prediction, map_mask = model(textual_input, textual_mask, visual_input)
+        loss_value, joint_prob = getattr(loss, config.LOSS.NAME)(
+            prediction, map_mask, map_gt, config.LOSS.PARAMS
+        )
         sorted_times = None if model.training else get_proposal_results(joint_prob, duration)
-
         return loss_value, sorted_times
 
     def get_proposal_results(scores, durations):
@@ -175,22 +179,24 @@ if __name__ == '__main__':
         for score, duration in zip(scores, durations):
             T = score.shape[-1]
             score_cpu = score.cpu().detach().numpy()
-            sorted_indexs = np.dstack(np.unravel_index(np.argsort(score_cpu.ravel())[::-1], (T, T))).tolist()
+            sorted_indexs = np.dstack(
+                np.unravel_index(np.argsort(score_cpu.ravel())[::-1], (T, T))
+            ).tolist()
             sorted_indexs = np.array([item for item in sorted_indexs[0] if item[0] <= item[1]]).astype(float)
-            sorted_scores = np.array([score_cpu[0, int(x[0]),int(x[1])] for x in sorted_indexs])
+            sorted_scores = np.array([score_cpu[0, int(x[0]), int(x[1])] for x in sorted_indexs])
 
-            sorted_indexs[:,1] = sorted_indexs[:,1] + 1
+            sorted_indexs[:, 1] = sorted_indexs[:, 1] + 1
             sorted_indexs = torch.from_numpy(sorted_indexs).cuda()
             target_size = config.DATASET.NUM_SAMPLE_CLIPS // config.DATASET.TARGET_STRIDE
             sorted_time = (sorted_indexs.float() / target_size * duration).tolist()
             out_sorted_times.append([[t[0], t[1], s] for t, s in zip(sorted_time, sorted_scores)])
-
         return out_sorted_times
 
     def on_start(state):
         state['loss_meter'] = AverageMeter()
         state['test_interval'] = int(len(train_dataset)/config.TRAIN.BATCH_SIZE*config.TEST.INTERVAL)
         state['t'] = 1
+        state['global_step'] = 0   # contatore globale per tensorboard
         model.train()
         if config.VERBOSE:
             state['progress_bar'] = tqdm(total=state['test_interval'])
@@ -199,20 +205,15 @@ if __name__ == '__main__':
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
         state['loss_meter'].update(state['loss'].item(), 1)
 
-    # Contatore esclusivo per TensorBoard
-    tensorboard_step = 0
-
     def on_update(state):
-        global tensorboard_step  # usiamo la variabile globale
-
         if config.VERBOSE:
             state['progress_bar'].update(1)
 
-        # Logging continuo train loss
+        # logging continuo train loss
         if writer is not None:
-            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=tensorboard_step)
+            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['global_step'])
 
-        # Test e validazione
+        # Validazione periodica
         if state['t'] % state['test_interval'] == 0:
             state['test_step'] = state['t']
             model.eval()
@@ -220,86 +221,31 @@ if __name__ == '__main__':
             if config.VERBOSE:
                 state['progress_bar'].close()
 
-            loss_message = '\niter: {} train loss {:.4f}'.format(state['t'], state['loss_meter'].avg)
-            table_message = ''
-
-            if config.TEST.EVAL_TRAIN:
-                train_state = engine.test(network, iterator('train_no_shuffle'), 'train')
-                train_table = eval.display_results(
-                    train_state['Rank@N,mIoU@M'],
-                    train_state['miou'],
-                    'performance on training set'
-                )
-                table_message += '\n' + train_table
-
             if not config.DATASET.NO_VAL:
                 val_state = engine.test(network, iterator('val'), 'val')
 
-                torch.cuda.empty_cache()
-                import gc
-                gc.collect()
-
                 if writer is not None:
-                    writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=tensorboard_step)
-                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=tensorboard_step)
+                    writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=state['global_step'])
+                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=state['global_step'])
 
                 state['scheduler'].step(-val_state['loss_meter'].avg)
-
-                loss_message += ' val loss {:.4f}'.format(val_state['loss_meter'].avg)
                 val_state['loss_meter'].reset()
-
-                val_table = eval.display_results(
-                    val_state['Rank@N,mIoU@M'],
-                    val_state['miou'],
-                    'performance on validation set'
-                )
-                table_message += '\n' + val_table
-
-            saved_model_filename = os.path.join(
-                config.MODEL_DIR,
-                '{}/{}/iter{:06d}-{:.4f}-{:.4f}.pkl'.format(
-                    dataset_name,
-                    model_name + '_' + config.DATASET.VIS_INPUT_TYPE,
-                    state['t'],
-                    train_state['Rank@N,mIoU@M'][0, 0],
-                    train_state['Rank@N,mIoU@M'][0, 1]
-                )
-            )
-
-            rootfolder1 = os.path.dirname(saved_model_filename)
-            rootfolder2 = os.path.dirname(rootfolder1)
-            rootfolder3 = os.path.dirname(rootfolder2)
-
-            for folder in [rootfolder3, rootfolder2, rootfolder1]:
-                if not os.path.exists(folder):
-                    print('Make directory %s ...' % folder)
-                    os.mkdir(folder)
-
-            if torch.cuda.device_count() > 1:
-                torch.save(model.module.state_dict(), saved_model_filename)
-            else:
-                torch.save(model.state_dict(), saved_model_filename)
-
-            if config.VERBOSE:
-                state['progress_bar'] = tqdm(total=state['test_interval'])
 
             model.train()
             state['loss_meter'].reset()
 
-        # Incrementiamo il contatore esclusivo per TensorBoard
-        tensorboard_step += 1
+            if config.VERBOSE:
+                state['progress_bar'] = tqdm(total=state['test_interval'])
+
+        # incrementa il contatore globale
+        state['global_step'] += 1
 
     def on_end(state):
         if config.VERBOSE:
             state['progress_bar'].close()
-            
-       # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
         print("Training completed.")
         if writer:
             writer.close()
-        #import sys
-        #sys.exit(0)
-       # ------------------------------------------------------------------
 
     def on_test_start(state):
         state['loss_meter'] = AverageMeter()
@@ -309,8 +255,6 @@ if __name__ == '__main__':
                 state['progress_bar'] = tqdm(total=math.ceil(len(train_dataset)/config.TEST.BATCH_SIZE))
             elif state['split'] == 'val':
                 state['progress_bar'] = tqdm(total=math.ceil(len(val_dataset)/config.TEST.BATCH_SIZE))
-#            elif state['split'] == 'test':
-#                state['progress_bar'] = tqdm(total=math.ceil(len(test_dataset)/config.TEST.BATCH_SIZE))
             else:
                 raise NotImplementedError
 
@@ -318,7 +262,6 @@ if __name__ == '__main__':
         if config.VERBOSE:
             state['progress_bar'].update(1)
         state['loss_meter'].update(state['loss'].item(), 1)
-
         min_idx = min(state['sample']['batch_anno_idxs'])
         batch_indexs = [idx - min_idx for idx in state['sample']['batch_anno_idxs']]
         sorted_segments = [state['output'][i] for i in batch_indexs]
@@ -327,22 +270,18 @@ if __name__ == '__main__':
     def on_test_end(state):
         annotations = state['iterator'].dataset.annotations
         merge = (state['split'] != 'train')
-        state['Rank@N,mIoU@M'], state['miou'] = eval.eval_predictions(state['sorted_segments_list'], annotations, verbose=False, merge_window=merge)
-      
-        torch.cuda.empty_cache() # SVUOTA RAM
-        import gc # SVUOTA RAM
-        gc.collect() # SVUOTA RAM
-       
+        state['Rank@N,mIoU@M'], state['miou'] = eval.eval_predictions(
+            state['sorted_segments_list'], annotations, verbose=False, merge_window=merge
+        )
+        torch.cuda.empty_cache()
+        import gc
+        gc.collect()
         if config.VERBOSE:
             state['progress_bar'].close()
 
-        # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
         if writer and state['split'] == 'val':
-            #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
-            #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state.get('test_step',state['t']))
-            writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
-        # ------------------------------------------------------------------
-    
+            writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['global_step'])
+
     engine = Engine()
     engine.hooks['on_start'] = on_start
     engine.hooks['on_forward'] = on_forward
