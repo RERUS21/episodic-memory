@@ -123,7 +123,7 @@ if __name__ == '__main__':
     model = model.to(device)
 
     optimizer = optim.Adam(model.parameters(),lr=config.TRAIN.LR,betas=(0.9, 0.999),weight_decay=config.TRAIN.WEIGHT_DECAY)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,factor=config.TRAIN.FACTOR,patience=config.TRAIN.PATIENCE,verbose=config.VERBOSE)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,factor=config.TRAIN.FACTOR,patience=config.TRAIN.PATIENCE)
 
     def iterator(split):
         if split == 'train':
