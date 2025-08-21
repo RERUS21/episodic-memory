@@ -82,7 +82,7 @@ def reset_config(config, args):
         print('=============== debug mode ==============')
 
 
-if _name_ == '_main_':
+if __name__ == '__main__':
 
     args = parse_args()
     reset_config(config, args)
