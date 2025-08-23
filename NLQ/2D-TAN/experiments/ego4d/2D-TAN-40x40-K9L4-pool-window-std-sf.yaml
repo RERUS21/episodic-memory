@@ -31,7 +31,7 @@ CUDNN:
 
 TRAIN:
   BATCH_SIZE: 16
-  LR: 0.001 #iniziale: 0.0001
+  LR: 0.01 #iniziale: 0.0001
   WEIGHT_DECAY: 0.0000
   #MAX_EPOCH: 50
   MAX_EPOCH: 1  # Alleggerito per limiti di utilizzo piano gratuito COLAB 
