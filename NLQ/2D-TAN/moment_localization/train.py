@@ -247,6 +247,15 @@ if __name__ == '__main__':
                     #writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=tensorboard_step)
                     writer.add_scalar('Validation/mIoU_on_update', val_state['miou'], global_step=tensorboard_step)
 
+                    # Logging Rank@N per diversi IoU
+                    recalls = [1, 3, 5]            # definiti nello YAML
+                    tious = [0.01, 0.3, 0.5]       # aggiunto anche 0.01
+                
+                    for i, r in enumerate(recalls):
+                        for j, t in enumerate(tious):
+                            val_value = val_state['Rank@N,mIoU@M'][i, j]
+                            writer.add_scalar(f'Validation/Rank@{r}_IoU@{t}', val_value, global_step=tensorboard_step)
+
                 state['scheduler'].step(-val_state['loss_meter'].avg)
 
                 loss_message += ' val loss {:.4f}'.format(val_state['loss_meter'].avg)
