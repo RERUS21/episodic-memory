@@ -346,7 +346,7 @@ if __name__ == '__main__':
             state['progress_bar'].close()
 
         # SEZIONE AGGIUNTA PER IL TENSORBOARD ------------------------------
-        if writer and state['split'] == 'val':
+        #if writer and state['split'] == 'val':
             #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
             #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state.get('test_step',state['t']))
             #writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
