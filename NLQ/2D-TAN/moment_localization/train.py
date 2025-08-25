@@ -245,7 +245,7 @@ if __name__ == '__main__':
 
                 if writer is not None:
                     #writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=tensorboard_step)
-                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=tensorboard_step)
+                    writer.add_scalar('Validation/mIoU_on_update', val_state['miou'], global_step=tensorboard_step)
 
                 state['scheduler'].step(-val_state['loss_meter'].avg)
 
