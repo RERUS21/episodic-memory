@@ -20,8 +20,8 @@ DATASET:
 
 TEST:
   BATCH_SIZE: 8
-  RECALL: 1,5
-  TIOU: 0.3,0.5
+  RECALL: 1,3,5 #aggiunto valore 3 ai fini del rank MIOU
+  TIOU: 0.01,0.3,0.5 #aggiunto il valore 0.01 ai fini del TIOU
   EVAL_TRAIN: True
   NMS_THRESH: 0.5
 
@@ -34,7 +34,7 @@ TRAIN:
   LR: 0.01 #iniziale: 0.0001
   WEIGHT_DECAY: 0.0000
   #MAX_EPOCH: 50
-  MAX_EPOCH: 1  # Alleggerito per limiti di utilizzo piano gratuito COLAB 
+  MAX_EPOCH: 2  # Alleggerito per limiti di utilizzo piano gratuito COLAB 
   CONTINUE: False
 
 LOSS:
