@@ -203,30 +203,28 @@ if __name__ == '__main__':
     tensorboard_step = 0
 
     def on_update(state):
-        global tensorboard_step  # usiamo la variabile globale
-
         if config.VERBOSE:
             state['progress_bar'].update(1)
-
-        # Logging continuo train loss
+    
+        # Logging continuo della train loss
         if writer is not None:
-            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=tensorboard_step)
-
-            # 👇 Logging del learning rate corrente
+            writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['t'])
+    
+            # 👇 Learning rate corrente
             current_lr = state['optimizer'].param_groups[0]['lr']
-            writer.add_scalar('LearningRate', current_lr, global_step=tensorboard_step)
-
+            writer.add_scalar('LearningRate', current_lr, global_step=state['t'])
+    
         # Test e validazione
         if state['t'] % state['test_interval'] == 0:
             state['test_step'] = state['t']
             model.eval()
-
+    
             if config.VERBOSE:
                 state['progress_bar'].close()
-
+    
             loss_message = '\niter: {} train loss {:.4f}'.format(state['t'], state['loss_meter'].avg)
             table_message = ''
-
+    
             if config.TEST.EVAL_TRAIN:
                 train_state = engine.test(network, iterator('train_no_shuffle'), 'train')
                 train_table = eval.display_results(
@@ -235,39 +233,40 @@ if __name__ == '__main__':
                     'performance on training set'
                 )
                 table_message += '\n' + train_table
-
+    
             if not config.DATASET.NO_VAL:
                 val_state = engine.test(network, iterator('val'), 'val')
-
+    
                 torch.cuda.empty_cache()
                 import gc
                 gc.collect()
-
+    
                 if writer is not None:
-                    #writer.add_scalar('Loss/val', val_state['loss_meter'].avg, global_step=tensorboard_step)
-                    writer.add_scalar('Validation/mIoU_on_update', val_state['miou'], global_step=tensorboard_step)
-
-                    # Logging Rank@N per diversi IoU
-                    recalls = [1, 3, 5]            # definiti nello YAML
-                    tious = [0.01, 0.3, 0.5]       # aggiunto anche 0.01
-                
+                    # 👇 mIoU medio
+                    writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=state['t'])
+    
+                    # 👇 Logging dettagliato Rank@N per diversi IoU
+                    recalls = [1, 3, 5]           # definiti nello YAML
+                    tious = [0.01, 0.3, 0.5]      # 👈 aggiunto anche 0.01
+    
                     for i, r in enumerate(recalls):
                         for j, t in enumerate(tious):
                             val_value = val_state['Rank@N,mIoU@M'][i, j]
-                            writer.add_scalar(f'Validation/Rank@{r}_IoU@{t}', val_value, global_step=tensorboard_step)
-
+                            writer.add_scalar(f'Validation/Rank@{r}_IoU@{t}', val_value, global_step=state['t'])
+    
+                # step dello scheduler
                 state['scheduler'].step(-val_state['loss_meter'].avg)
-
+    
                 loss_message += ' val loss {:.4f}'.format(val_state['loss_meter'].avg)
                 val_state['loss_meter'].reset()
-
+    
                 val_table = eval.display_results(
                     val_state['Rank@N,mIoU@M'],
                     val_state['miou'],
                     'performance on validation set'
                 )
                 table_message += '\n' + val_table
-
+    
             saved_model_filename = os.path.join(
                 config.MODEL_DIR,
                 '{}/{}/iter{:06d}-{:.4f}-{:.4f}.pkl'.format(
@@ -278,29 +277,26 @@ if __name__ == '__main__':
                     train_state['Rank@N,mIoU@M'][0, 1]
                 )
             )
-
+    
             rootfolder1 = os.path.dirname(saved_model_filename)
             rootfolder2 = os.path.dirname(rootfolder1)
             rootfolder3 = os.path.dirname(rootfolder2)
-
+    
             for folder in [rootfolder3, rootfolder2, rootfolder1]:
                 if not os.path.exists(folder):
                     print('Make directory %s ...' % folder)
                     os.mkdir(folder)
-
+    
             if torch.cuda.device_count() > 1:
                 torch.save(model.module.state_dict(), saved_model_filename)
             else:
                 torch.save(model.state_dict(), saved_model_filename)
-
+    
             if config.VERBOSE:
                 state['progress_bar'] = tqdm(total=state['test_interval'])
-
+    
             model.train()
             state['loss_meter'].reset()
-
-        # Incrementiamo il contatore esclusivo per TensorBoard
-        tensorboard_step += 1
 
     def on_end(state):
         if config.VERBOSE:
@@ -353,7 +349,7 @@ if __name__ == '__main__':
         if writer and state['split'] == 'val':
             #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state['t'])
             #writer.add_scalar('Validation/Loss', state['loss_meter'].val, global_step=state.get('test_step',state['t']))
-            writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
+            #writer.add_scalar('Validation/mIoU', state['miou'], global_step=state['t'])
         # ------------------------------------------------------------------
     
     engine = Engine()
