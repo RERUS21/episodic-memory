@@ -210,7 +210,7 @@ if __name__ == '__main__':
         if writer is not None:
             writer.add_scalar('Loss/train', state['loss_meter'].val, global_step=state['t'])
     
-            # 👇 Learning rate corrente
+            # Learning rate corrente
             current_lr = state['optimizer'].param_groups[0]['lr']
             writer.add_scalar('LearningRate', current_lr, global_step=state['t'])
     
@@ -242,12 +242,12 @@ if __name__ == '__main__':
                 gc.collect()
     
                 if writer is not None:
-                    # 👇 mIoU medio
+                    # mIoU medio
                     writer.add_scalar('Validation/mIoU', val_state['miou'], global_step=state['t'])
     
-                    # 👇 Logging dettagliato Rank@N per diversi IoU
+                    # Logging dettagliato Rank@N per diversi IoU
                     recalls = [1, 3, 5]           # definiti nello YAML
-                    tious = [0.01, 0.3, 0.5]      # 👈 aggiunto anche 0.01
+                    tious = [0.01, 0.3, 0.5]      # aggiunto anche 0.01
     
                     for i, r in enumerate(recalls):
                         for j, t in enumerate(tious):
